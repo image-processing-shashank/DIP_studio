@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getCatalog, processImage } from "./lib/api";
 import Controls from "./components/Controls";
 import ResultView from "./components/ResultView";
@@ -17,21 +17,42 @@ export default function Page() {
   const [busy, setBusy] = useState(false);
   const [infoOp, setInfoOp] = useState(null);
   const [imageInfo, setImageInfo] = useState(null);
+  const [drag, setDrag] = useState(false);
+  const [search, setSearch] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [auto, setAuto] = useState(false);
+  const [zoomImg, setZoomImg] = useState(null);
+
+  const fileInputRef = useRef(null);
+  const abortRef = useRef(null);
+  const debounceRef = useRef(null);
 
   useEffect(() => {
     getCatalog().then(setCatalog).catch((e) => setError(e.message));
   }, []);
 
-  // Flat lookup of operations by id.
   const opsById = useMemo(() => {
     const map = {};
-    catalog?.projects.forEach((g) =>
-      g.operations.forEach((o) => (map[o.id] = o))
-    );
+    catalog?.projects.forEach((g) => g.operations.forEach((o) => (map[o.id] = o)));
     return map;
   }, [catalog]);
 
   const currentOp = opId ? opsById[opId] : null;
+
+  // Filtered catalog for sidebar search
+  const filtered = useMemo(() => {
+    if (!catalog) return [];
+    const q = search.trim().toLowerCase();
+    if (!q) return catalog.projects;
+    return catalog.projects
+      .map((g) => ({
+        ...g,
+        operations: g.operations.filter(
+          (o) => o.name.toLowerCase().includes(q) || g.project.toLowerCase().includes(q)
+        ),
+      }))
+      .filter((g) => g.operations.length > 0);
+  }, [catalog, search]);
 
   function selectOp(id) {
     setOpId(id);
@@ -40,10 +61,10 @@ export default function Page() {
     op.params.forEach((p) => (defs[p.name] = p.default));
     setValues(defs);
     setResult(null);
+    setMenuOpen(false);
   }
 
-  function onFile(e) {
-    const f = e.target.files[0];
+  function loadFile(f) {
     if (!f) return;
     setFile(f);
     setPreview(URL.createObjectURL(f));
@@ -51,120 +72,233 @@ export default function Page() {
     setImageInfo(null);
   }
 
+  function onFile(e) { loadFile(e.target.files[0]); }
+
+  function onDrop(e) {
+    e.preventDefault();
+    setDrag(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f && f.type.startsWith("image/")) loadFile(f);
+    else if (f) loadFile(f); // tiff/ppm may have empty type
+  }
+
   async function run() {
     if (!file || !currentOp) return;
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setBusy(true);
     setError("");
     try {
-      const res = await processImage(file, currentOp.id, values);
+      const res = await processImage(file, currentOp.id, values, controller.signal);
       setResult(res);
       if (res.image_info) setImageInfo(res.image_info);
     } catch (e) {
-      setError(e.message);
+      if (e.name !== "AbortError") setError(e.message);
     } finally {
       setBusy(false);
     }
   }
 
+  // Auto-run with debounce when params/op change
+  useEffect(() => {
+    if (!auto || !file || !currentOp) return;
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(run, 350);
+    return () => clearTimeout(debounceRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values, opId, auto, file]);
+
+  // Keyboard: Enter = run, Esc closes things
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Enter" && !busy && file && currentOp && !infoOp && !zoomImg) {
+        if (document.activeElement?.tagName !== "INPUT" || document.activeElement?.type === "range") run();
+      }
+      if (e.key === "Escape") { setZoomImg(null); setMenuOpen(false); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy, file, currentOp, values, infoOp, zoomImg]);
+
   return (
-    <main className="page">
+    <div className="shell">
       <header className="topbar">
-        <div>
-          <h1>DIP Studio</h1>
-          <p className="muted">Digital Image Processing pipeline · IIT Delhi mPragati</p>
+        <div className="brand">
+          {catalog && <button className="menu-btn" onClick={() => setMenuOpen(true)} aria-label="Menu">☰</button>}
+          <div className="logo-mark">DIP</div>
+          <div>
+            <h1>DIP Studio</h1>
+            <div className="sub">Image Processing Pipeline · IIT Delhi mPragati</div>
+          </div>
+        </div>
+        <div className="topbar-right">
+          <span className="kbd-hint"><span className="kbd">Enter</span> to run</span>
         </div>
       </header>
 
-      {error && <div className="error">{error}</div>}
+      <div className="container">
+        {error && <div className="error" style={{ marginBottom: 14 }}>⚠ {error}</div>}
 
-      <section className="upload">
-        <label className="file-btn">
-          {file ? "Change image" : "Upload image (PNG / JPEG / TIFF / PPM)"}
-          <input type="file" accept="image/png,image/jpeg,image/tiff,.tif,.tiff,.ppm,.pgm,.pbm" onChange={onFile} />
-        </label>
-        {preview && (
-          <div className="preview-wrap">
-            <img className="preview" src={preview} alt="input preview" />
-            {imageInfo && (
-              <div className="img-badges">
-                <span className={"img-badge " + (imageInfo.is_color ? "badge-rgb" : "badge-gray")}>
-                  {imageInfo.is_color ? "RGB" : "Grayscale"}
-                </span>
-                <span className="img-badge badge-info">{imageInfo.bit_depth}-bit</span>
-                <span className="img-badge badge-info">{imageInfo.width} × {imageInfo.height}</span>
-                <span className="img-badge badge-info">{imageInfo.channels}ch</span>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
+        {!catalog && !error && <p className="muted">Loading operations…</p>}
 
-      {!catalog && !error && <p className="muted">Loading operations…</p>}
-
-      {catalog && (
-        <div className="layout">
-          <aside className="sidebar">
-            {catalog.projects.map((g) => (
-              <div className="proj" key={g.order}>
-                <div className="proj-title">
-                  {g.order}. {g.project}
+        {catalog && (
+          <div className="layout">
+            {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} />}
+            <aside className={"sidebar" + (menuOpen ? " open" : "")}>
+              <div className="sidebar-search">
+                <div className="search-box">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" strokeLinecap="round" />
+                  </svg>
+                  <input
+                    placeholder="Search operations…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
                 </div>
-                {g.operations.map((o) => (
-                  <div
-                    key={o.id}
-                    className={"op-row" + (o.id === opId ? " active" : "")}
-                  >
-                    <button className="op-btn" onClick={() => selectOp(o.id)}>
-                      {o.name}
-                    </button>
-                    <button
-                      className="info-sup"
-                      title="What is this?"
-                      onClick={() => setInfoOp(o)}
-                    >
-                      i
-                    </button>
+              </div>
+              <div className="sidebar-scroll">
+                {filtered.length === 0 && <div className="no-results">No operations match “{search}”.</div>}
+                {filtered.map((g) => (
+                  <div className="proj" key={g.order}>
+                    <div className="proj-title"><span className="proj-num">{g.order}</span>{g.project}</div>
+                    {g.operations.map((o) => (
+                      <div key={o.id} className={"op-row" + (o.id === opId ? " active" : "")}>
+                        <button className="op-btn" onClick={() => selectOp(o.id)}>{o.name}</button>
+                        <button className="info-sup" title="What is this?" onClick={() => setInfoOp(o)}>i</button>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
-            ))}
-          </aside>
+            </aside>
 
-          <div className="work">
-            {currentOp ? (
-              <>
-                <div className="op-head">
-                  <h2>
-                    {currentOp.name}
-                    <button className="info-sup" onClick={() => setInfoOp(currentOp)} title="What is this?">
-                      i
-                    </button>
-                  </h2>
-                  <p className="muted">{currentOp.description}</p>
-                </div>
-
-                <Controls
-                  params={currentOp.params}
-                  values={values}
-                  onChange={(k, v) => setValues((s) => ({ ...s, [k]: v }))}
+            <div className="work">
+              {/* Dropzone / upload */}
+              <div
+                className={"dropzone" + (drag ? " drag" : "") + (file ? " has-file" : "")}
+                onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+                onDragLeave={() => setDrag(false)}
+                onDrop={onDrop}
+                onClick={() => !file && fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/tiff,.tif,.tiff,.ppm,.pgm,.pbm"
+                  onChange={onFile}
+                  style={{ display: "none" }}
                 />
+                {!file ? (
+                  <>
+                    <div className="dz-icon">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 16V4M12 4l-4 4M12 4l4 4" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                    <div className="dz-text">
+                      <div className="dz-title">Drop an image here, or click to browse</div>
+                      <div className="dz-sub">PNG · JPEG · TIFF · PPM — up to {catalog.limits?.max_upload_mb || 600} MB</div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="dz-preview">
+                    <img className="dz-thumb" src={preview} alt="preview" />
+                    <div className="dz-meta">
+                      <div className="dz-filename">{file.name}</div>
+                      {imageInfo ? (
+                        <div className="badges">
+                          <span className={"badge " + (imageInfo.is_color ? "badge-rgb" : "badge-gray")}>
+                            {imageInfo.is_color ? "RGB" : "GRAYSCALE"}
+                          </span>
+                          <span className="badge badge-info">{imageInfo.bit_depth}-bit</span>
+                          <span className="badge badge-info">{imageInfo.width}×{imageInfo.height}</span>
+                          <span className="badge badge-info">{imageInfo.channels}ch</span>
+                        </div>
+                      ) : (
+                        <div className="dz-sub">Run an operation to inspect type and dimensions.</div>
+                      )}
+                    </div>
+                    <button className="dz-change" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>Change</button>
+                  </div>
+                )}
+              </div>
 
-                <button className="run-btn" onClick={run} disabled={!file || busy}>
-                  {busy ? "Processing…" : "Run"}
-                </button>
+              {currentOp ? (
+                <>
+                  <div className="op-head">
+                    <div className="op-head-top">
+                      <h2>
+                        {currentOp.name}
+                        <button className="info-sup" onClick={() => setInfoOp(currentOp)} title="About this operation">i</button>
+                      </h2>
+                      <span className="op-chip">{currentOp.project}</span>
+                    </div>
+                    <p>{currentOp.description}</p>
+                  </div>
 
-                {!file && <p className="muted">Upload an image to run this operation.</p>}
+                  <Controls
+                    params={currentOp.params}
+                    values={values}
+                    onChange={(k, v) => setValues((s) => ({ ...s, [k]: v }))}
+                    onReset={() => {
+                      const defs = {};
+                      currentOp.params.forEach((p) => (defs[p.name] = p.default));
+                      setValues(defs);
+                    }}
+                  />
 
-                <ResultView result={result} />
-              </>
-            ) : (
-              <p className="muted">Select an operation from the left to begin.</p>
-            )}
+                  <div className="action-bar">
+                    <button className="run-btn" onClick={run} disabled={!file || busy}>
+                      {busy ? <><span className="run-spinner" /> Processing…</> : <>▶ Run operation</>}
+                    </button>
+                    <label className="auto-toggle">
+                      <span className="switch">
+                        <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
+                        <span className="switch-track" />
+                      </span>
+                      Live preview
+                    </label>
+                    {!file && <span className="muted">Upload an image to enable Run.</span>}
+                  </div>
+
+                  {busy && !result && (
+                    <div className="result-card">
+                      <div className="skel-grid">
+                        <div className="skel skel-card" /><div className="skel skel-card" /><div className="skel skel-card" />
+                      </div>
+                    </div>
+                  )}
+
+                  <ResultView result={result} onZoom={setZoomImg} />
+                </>
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-art">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#167a52" strokeWidth="1.8">
+                      <rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <h3>Pick an operation to begin</h3>
+                  <p className="muted">Choose any of the {catalog.projects.reduce((n, g) => n + g.operations.length, 0)} operations from the sidebar.</p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <InfoModal op={infoOp} onClose={() => setInfoOp(null)} />
-    </main>
+
+      {zoomImg && (
+        <div className="lightbox" onClick={() => setZoomImg(null)}>
+          <img src={zoomImg.data} alt={zoomImg.label} />
+          <div className="lightbox-cap">{zoomImg.label} · click anywhere to close</div>
+        </div>
+      )}
+    </div>
   );
 }

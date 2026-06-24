@@ -1,7 +1,15 @@
 "use client";
 
-// Modal that explains an operation and the maths involved.
+import { useEffect } from "react";
+
 export default function InfoModal({ op, onClose }) {
+  useEffect(() => {
+    if (!op) return;
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [op, onClose]);
+
   if (!op) return null;
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -10,32 +18,35 @@ export default function InfoModal({ op, onClose }) {
           <h3>{op.name}</h3>
           <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
         </div>
-        <p className="muted">{op.project}</p>
-        <p>{op.description}</p>
-        {op.math ? (
+        <span className="modal-project">{op.project}</span>
+        <p className="modal-desc">{op.description}</p>
+
+        {op.math && (
           <>
-            <div className="modal-label">Maths involved</div>
+            <div className="modal-section-label">Maths involved</div>
             <pre className="math">{op.math}</pre>
           </>
-        ) : null}
-        {op.params && op.params.length ? (
+        )}
+
+        {op.params && op.params.length > 0 && (
           <>
-            <div className="modal-label">Parameters</div>
-            <ul className="param-help">
+            <div className="modal-section-label">Parameters</div>
+            <ul className="param-list">
               {op.params.map((p) => (
-                <li key={p.name}>
-                  <strong>{p.label}</strong>
-                  {p.type === "slider" && p.min != null
-                    ? ` (range ${p.min} to ${p.max})`
-                    : p.type === "select"
-                    ? ` (${(p.options || []).join(", ")})`
-                    : ""}
-                  {p.help ? ` — ${p.help}` : ""}
+                <li className="param-item" key={p.name}>
+                  <span className="param-name">{p.label}</span>
+                  {p.type === "slider" && p.min != null && (
+                    <span className="param-range">{p.min} – {p.max} · step {p.step}</span>
+                  )}
+                  {p.type === "select" && (
+                    <span className="param-range">{(p.options || []).join(" / ")}</span>
+                  )}
+                  {p.help && <span className="param-help">{p.help}</span>}
                 </li>
               ))}
             </ul>
           </>
-        ) : null}
+        )}
       </div>
     </div>
   );
