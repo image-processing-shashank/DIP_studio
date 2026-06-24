@@ -11,6 +11,7 @@ export default function Page() {
   const [error, setError] = useState("");
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [thumbOk, setThumbOk] = useState(true);     // does the browser preview render?
   const [opId, setOpId] = useState(null);
   const [values, setValues] = useState({});
   const [result, setResult] = useState(null);
@@ -18,8 +19,7 @@ export default function Page() {
   const [infoOp, setInfoOp] = useState(null);
   const [imageInfo, setImageInfo] = useState(null);
   const [drag, setDrag] = useState(false);
-  const [search, setSearch] = useState("");
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [auto, setAuto] = useState(false);
   const [zoomImg, setZoomImg] = useState(null);
 
@@ -39,21 +39,6 @@ export default function Page() {
 
   const currentOp = opId ? opsById[opId] : null;
 
-  // Filtered catalog for sidebar search
-  const filtered = useMemo(() => {
-    if (!catalog) return [];
-    const q = search.trim().toLowerCase();
-    if (!q) return catalog.projects;
-    return catalog.projects
-      .map((g) => ({
-        ...g,
-        operations: g.operations.filter(
-          (o) => o.name.toLowerCase().includes(q) || g.project.toLowerCase().includes(q)
-        ),
-      }))
-      .filter((g) => g.operations.length > 0);
-  }, [catalog, search]);
-
   function selectOp(id) {
     setOpId(id);
     const op = opsById[id];
@@ -61,12 +46,13 @@ export default function Page() {
     op.params.forEach((p) => (defs[p.name] = p.default));
     setValues(defs);
     setResult(null);
-    setMenuOpen(false);
+    if (window.innerWidth <= 860) setSidebarOpen(false);
   }
 
   function loadFile(f) {
     if (!f) return;
     setFile(f);
+    setThumbOk(true);                         // assume it renders until onError says otherwise
     setPreview(URL.createObjectURL(f));
     setResult(null);
     setImageInfo(null);
@@ -78,8 +64,7 @@ export default function Page() {
     e.preventDefault();
     setDrag(false);
     const f = e.dataTransfer.files?.[0];
-    if (f && f.type.startsWith("image/")) loadFile(f);
-    else if (f) loadFile(f); // tiff/ppm may have empty type
+    if (f) loadFile(f);
   }
 
   async function run() {
@@ -100,7 +85,6 @@ export default function Page() {
     }
   }
 
-  // Auto-run with debounce when params/op change
   useEffect(() => {
     if (!auto || !file || !currentOp) return;
     clearTimeout(debounceRef.current);
@@ -109,24 +93,31 @@ export default function Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [values, opId, auto, file]);
 
-  // Keyboard: Enter = run, Esc closes things
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Enter" && !busy && file && currentOp && !infoOp && !zoomImg) {
         if (document.activeElement?.tagName !== "INPUT" || document.activeElement?.type === "range") run();
       }
-      if (e.key === "Escape") { setZoomImg(null); setMenuOpen(false); }
+      if (e.key === "Escape") { setZoomImg(null); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busy, file, currentOp, values, infoOp, zoomImg]);
 
+  const showThumb = preview && thumbOk;
+
   return (
     <div className="shell">
       <header className="topbar">
         <div className="brand">
-          {catalog && <button className="menu-btn" onClick={() => setMenuOpen(true)} aria-label="Menu">☰</button>}
+          {catalog && (
+            <button className="menu-btn" onClick={() => setSidebarOpen((v) => !v)} aria-label="Toggle sidebar">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M3 6h18M3 12h18M3 18h18" />
+              </svg>
+            </button>
+          )}
           <div className="logo-mark">DIP</div>
           <div>
             <h1>DIP Studio</h1>
@@ -139,29 +130,16 @@ export default function Page() {
       </header>
 
       <div className="container">
-        {error && <div className="error" style={{ marginBottom: 14 }}>⚠ {error}</div>}
+        {error && <div className="error" style={{ marginBottom: 12 }}>⚠ {error}</div>}
 
         {!catalog && !error && <p className="muted">Loading operations…</p>}
 
         {catalog && (
-          <div className="layout">
-            {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} />}
-            <aside className={"sidebar" + (menuOpen ? " open" : "")}>
-              <div className="sidebar-search">
-                <div className="search-box">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" strokeLinecap="round" />
-                  </svg>
-                  <input
-                    placeholder="Search operations…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-              </div>
+          <div className={"layout" + (sidebarOpen ? "" : " collapsed")}>
+            {sidebarOpen && <div className="scrim" onClick={() => setSidebarOpen(false)} />}
+            <aside className={"sidebar" + (sidebarOpen ? " open" : "")}>
               <div className="sidebar-scroll">
-                {filtered.length === 0 && <div className="no-results">No operations match “{search}”.</div>}
-                {filtered.map((g) => (
+                {catalog.projects.map((g) => (
                   <div className="proj" key={g.order}>
                     <div className="proj-title"><span className="proj-num">{g.order}</span>{g.project}</div>
                     {g.operations.map((o) => (
@@ -176,7 +154,6 @@ export default function Page() {
             </aside>
 
             <div className="work">
-              {/* Dropzone / upload */}
               <div
                 className={"dropzone" + (drag ? " drag" : "") + (file ? " has-file" : "")}
                 onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
@@ -206,7 +183,14 @@ export default function Page() {
                   </>
                 ) : (
                   <div className="dz-preview">
-                    <img className="dz-thumb" src={preview} alt="preview" />
+                    {showThumb && (
+                      <img
+                        className="dz-thumb"
+                        src={preview}
+                        alt="preview"
+                        onError={() => setThumbOk(false)}
+                      />
+                    )}
                     <div className="dz-meta">
                       <div className="dz-filename">{file.name}</div>
                       {imageInfo ? (
