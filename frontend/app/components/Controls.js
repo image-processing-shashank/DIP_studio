@@ -18,9 +18,9 @@ function ParamInfo({ param }) {
 
   const range =
     param.type === "slider"
-      ? `Range ${param.min} to ${param.max}, step ${param.step}. Default ${param.default}.`
+      ? `${param.min}–${param.max} · step ${param.step} · default ${param.default}`
       : param.type === "select"
-      ? `Options: ${(param.options || []).join(", ")}. Default ${param.default}.`
+      ? `default ${param.default}`
       : "";
 
   return (
@@ -33,9 +33,8 @@ function ParamInfo({ param }) {
       >i</button>
       {open && (
         <span className="param-pop" role="tooltip">
-          <span className="param-pop-title">{param.label}</span>
-          {param.help && <span className="param-pop-help">{param.help}</span>}
-          <span className="param-pop-range">{range}</span>
+          <span className="param-pop-help">{param.help || param.label}</span>
+          {range && <span className="param-pop-range">{range}</span>}
         </span>
       )}
     </span>
