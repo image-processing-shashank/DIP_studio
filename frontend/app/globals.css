@@ -203,8 +203,25 @@ button { font-family: inherit; }
 .ctrl-q {
   width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--border-md);
   font-size: 8px; font-style: italic; font-weight: 700; color: var(--hint);
-  display: grid; place-items: center; cursor: help; flex-shrink: 0;
+  display: grid; place-items: center; cursor: pointer; flex-shrink: 0;
+  background: var(--surface); padding: 0; transition: all .1s;
 }
+.ctrl-q:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-lt); }
+.param-info-wrap { position: relative; display: inline-flex; }
+.param-pop {
+  position: absolute; bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%);
+  width: 230px; background: var(--text); color: #fff;
+  border-radius: var(--r-md); padding: 9px 11px; z-index: 30;
+  box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 4px;
+  animation: pop .12s ease;
+}
+.param-pop::after {
+  content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  border: 6px solid transparent; border-top-color: var(--text);
+}
+.param-pop-title { font-size: 11.5px; font-weight: 700; }
+.param-pop-help { font-size: 11.5px; line-height: 1.45; color: #e8e8e6; }
+.param-pop-range { font-size: 10.5px; color: #b8b8b4; font-family: var(--mono); margin-top: 2px; }
 .slider-wrap { flex: 1; display: flex; align-items: center; gap: 12px; }
 input[type="range"] {
   flex: 1; -webkit-appearance: none; appearance: none; height: 5px;

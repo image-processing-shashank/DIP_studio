@@ -145,7 +145,6 @@ export default function Page() {
                     {g.operations.map((o) => (
                       <div key={o.id} className={"op-row" + (o.id === opId ? " active" : "")}>
                         <button className="op-btn" onClick={() => selectOp(o.id)}>{o.name}</button>
-                        <button className="info-sup" title="What is this?" onClick={() => setInfoOp(o)}>i</button>
                       </div>
                     ))}
                   </div>
