@@ -85,15 +85,9 @@ function CompareSlider({ images }) {
         onMouseDown={(e) => { dragging.current = true; move(e.clientX); }}
         onTouchStart={(e) => { dragging.current = true; move(e.touches[0].clientX); }}
       >
-<<<<<<< HEAD
-        <img src={images[aIdx].data} alt={images[aIdx].label} />
-        <div className="after-layer" style={{ width: `${pos}%` }}>
-          <img src={images[bIdx].data} alt={images[bIdx].label} />
-=======
         <img src={images[bIdx].data} alt={images[bIdx].label} />
         <div className="after-layer" style={{ width: `${pos}%` }}>
           <img src={images[aIdx].data} alt={images[aIdx].label} />
->>>>>>> 9c0ae19 (Functionality corrections)
         </div>
         <div className="compare-handle" style={{ left: `${pos}%` }}>
           <div className="compare-knob">⇆</div>
