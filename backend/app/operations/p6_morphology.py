@@ -31,9 +31,12 @@ def _kernel(ctx: Context):
 _PARAMS = [
     Param("invert", "Invert (white objects)", "select", "no", options=["no", "yes"],
           help="Use 'yes' for dark objects on a light background, e.g. text scans."),
-    Param("shape", "Structuring element", "select", "ellipse", options=["rect", "ellipse", "cross"]),
-    Param("ksize", "Element size", "slider", 5, 1, 31, 1),
-    Param("iterations", "Iterations", "slider", 1, 1, 10, 1),
+    Param("shape", "Structuring element", "select", "ellipse", options=["rect", "ellipse", "cross"],
+          help="Shape of the probe slid across the image. Rect treats all directions through its square corners, ellipse keeps boundaries rounder, cross only affects horizontal and vertical directions."),
+    Param("ksize", "Element size", "slider", 5, 1, 31, 1,
+          help="Size of the structuring element. Larger elements have a stronger effect, removing or filling bigger features and moving object boundaries further."),
+    Param("iterations", "Iterations", "slider", 1, 1, 10, 1,
+          help="How many times the operation is applied in sequence. More iterations behave like a larger structuring element."),
 ]
 
 
@@ -52,7 +55,8 @@ _PARAMS = [
           "Gradient = dilation - erosion (outline)"),
     params=[
         Param("op", "Operation", "select", "open",
-              options=["erode", "dilate", "open", "close", "gradient", "tophat", "blackhat"]),
+              options=["erode", "dilate", "open", "close", "gradient", "tophat", "blackhat"],
+              help="Which morphological operation to apply. Erode shrinks white regions; dilate grows them; open removes small specks; close fills small holes; gradient outlines edges; tophat isolates small bright features; blackhat isolates small dark features."),
         *_PARAMS,
     ],
 )

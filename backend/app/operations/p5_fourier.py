@@ -46,7 +46,8 @@ def spectrum(ctx: Context) -> Result:
     name="Low-Pass Filter",
     description="Keeps central low frequencies inside the cutoff radius. Smooths the image.",
     math="H(u,v) = 1 if D(u,v) <= radius else 0;  D = distance from spectrum center",
-    params=[Param("radius", "Cutoff radius", "slider", 40, 1, 400, 1)],
+    params=[Param("radius", "Cutoff radius", "slider", 40, 1, 400, 1,
+              help="Keeps frequencies within this many pixels of the spectrum centre and discards the rest. Smaller radius keeps only the lowest frequencies, giving a blurrier result.")],
 )
 def lowpass(ctx: Context) -> Result:
     f = _fft(ctx.gray)
@@ -61,7 +62,8 @@ def lowpass(ctx: Context) -> Result:
     name="High-Pass Filter",
     description="Removes central low frequencies. Keeps edges and fine detail.",
     math="H(u,v) = 1 if D(u,v) > radius else 0",
-    params=[Param("radius", "Cutoff radius", "slider", 40, 1, 400, 1)],
+    params=[Param("radius", "Cutoff radius", "slider", 40, 1, 400, 1,
+              help="Removes frequencies within this many pixels of the spectrum centre and keeps the rest. Larger radius removes more low-frequency content, leaving only fine edges and detail.")],
 )
 def highpass(ctx: Context) -> Result:
     f = _fft(ctx.gray)
@@ -77,8 +79,10 @@ def highpass(ctx: Context) -> Result:
     description="Keeps a ring of frequencies between an inner and outer radius.",
     math="H(u,v) = 1 if r_inner <= D(u,v) <= r_outer else 0",
     params=[
-        Param("r_inner", "Inner radius", "slider", 20, 0, 400, 1),
-        Param("r_outer", "Outer radius", "slider", 80, 1, 400, 1),
+        Param("r_inner", "Inner radius", "slider", 20, 0, 400, 1,
+              help="Inner edge of the kept frequency ring. Frequencies closer to the centre than this are removed, so raising it strips away more of the smooth, low-frequency content."),
+        Param("r_outer", "Outer radius", "slider", 80, 1, 400, 1,
+              help="Outer edge of the kept frequency ring. Frequencies further from the centre than this are removed, so lowering it strips away more fine detail and edges."),
     ],
 )
 def bandpass(ctx: Context) -> Result:

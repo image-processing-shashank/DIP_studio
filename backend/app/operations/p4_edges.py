@@ -43,8 +43,10 @@ def _prewitt(g):
     description="Gradient operator with center weighting. Smoother than Prewitt.",
     math="Gx, Gy via Sobel kernels;  magnitude = sqrt(Gx^2 + Gy^2)",
     params=[
-        Param("blur", "Pre-blur kernel", "slider", 3, 0, 15, 1),
-        Param("ksize", "Sobel aperture", "select", 3, options=[1, 3, 5, 7]),
+        Param("blur", "Pre-blur kernel", "slider", 3, 0, 15, 1,
+              help="Smooths the image before detecting edges, which suppresses noise. 0 disables it. Larger values remove more noise but can soften real edges. Odd sizes only."),
+        Param("ksize", "Sobel aperture", "select", 3, options=[1, 3, 5, 7],
+              help="Size of the Sobel gradient window. Larger apertures respond to broader, smoother edges and are less sensitive to fine noise."),
     ],
 )
 def sobel(ctx: Context) -> Result:
@@ -62,8 +64,10 @@ def sobel(ctx: Context) -> Result:
     description="Second-derivative operator. Highlights fine detail but is noise sensitive.",
     math="L = d2f/dx2 + d2f/dy2;  output = |L|",
     params=[
-        Param("blur", "Pre-blur kernel", "slider", 3, 0, 15, 1),
-        Param("ksize", "Laplacian aperture", "select", 3, options=[1, 3, 5, 7]),
+        Param("blur", "Pre-blur kernel", "slider", 3, 0, 15, 1,
+              help="Smooths the image before detecting edges, which suppresses noise. 0 disables it. Larger values remove more noise but can soften real edges. Odd sizes only."),
+        Param("ksize", "Laplacian aperture", "select", 3, options=[1, 3, 5, 7],
+              help="Size of the Laplacian window. Larger apertures capture coarser intensity changes; smaller ones pick out fine detail but amplify noise."),
     ],
 )
 def laplacian(ctx: Context) -> Result:
@@ -79,9 +83,12 @@ def laplacian(ctx: Context) -> Result:
     description="Multi-stage detector: smoothing, gradient, non-maximum suppression, hysteresis.",
     math="Keep edges with gradient > high; extend through pixels > low connected to them.",
     params=[
-        Param("blur", "Pre-blur kernel", "slider", 3, 0, 15, 1),
-        Param("low", "Low threshold", "slider", 100, 0, 255, 1),
-        Param("high", "High threshold", "slider", 200, 0, 255, 1),
+        Param("blur", "Pre-blur kernel", "slider", 3, 0, 15, 1,
+              help="Smooths the image before detecting edges, which suppresses noise. 0 disables it. Larger values remove more noise but can soften real edges. Odd sizes only."),
+        Param("low", "Low threshold", "slider", 100, 0, 255, 1,
+              help="Weak-edge threshold. Pixels above it are kept only if they connect to a strong edge. Lower values keep more faint edges (and more noise)."),
+        Param("high", "High threshold", "slider", 200, 0, 255, 1,
+              help="Strong-edge threshold. Pixels above it are always kept as edges. A common rule is to set it 2 to 3 times the low threshold."),
     ],
 )
 def canny(ctx: Context) -> Result:
@@ -97,9 +104,12 @@ def canny(ctx: Context) -> Result:
     description="Runs Roberts, Prewitt, Sobel, Laplacian, and Canny with shared preprocessing.",
     math="Same pre-blur applied to every detector for a fair comparison.",
     params=[
-        Param("blur", "Pre-blur kernel", "slider", 3, 0, 15, 1),
-        Param("low", "Canny low", "slider", 100, 0, 255, 1),
-        Param("high", "Canny high", "slider", 200, 0, 255, 1),
+        Param("blur", "Pre-blur kernel", "slider", 3, 0, 15, 1,
+              help="Smooths the image before detecting edges, which suppresses noise. 0 disables it. Larger values remove more noise but can soften real edges. Odd sizes only."),
+        Param("low", "Canny low", "slider", 100, 0, 255, 1,
+              help="Weak-edge threshold for the Canny detector in the comparison. Lower keeps more faint edges."),
+        Param("high", "Canny high", "slider", 200, 0, 255, 1,
+              help="Strong-edge threshold for the Canny detector in the comparison. Pixels above it are always edges."),
     ],
 )
 def compare(ctx: Context) -> Result:
