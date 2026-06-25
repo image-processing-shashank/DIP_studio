@@ -135,20 +135,28 @@ export default function Page() {
         {!catalog && !error && <p className="muted">Loading operations…</p>}
 
         {catalog && (
-          <div className={"layout" + (sidebarOpen ? "" : " collapsed")}>
+          <div className={"layout" + (sidebarOpen ? "" : " rail")}>
             {sidebarOpen && <div className="scrim" onClick={() => setSidebarOpen(false)} />}
-            <aside className={"sidebar" + (sidebarOpen ? " open" : "")}>
+            <aside className={"sidebar" + (sidebarOpen ? " open" : " collapsed")}>
               <div className="sidebar-scroll">
-                {catalog.projects.map((g) => (
-                  <div className="proj" key={g.order}>
-                    <div className="proj-title"><span className="proj-num">{g.order}</span>{g.project}</div>
-                    {g.operations.map((o) => (
-                      <div key={o.id} className={"op-row" + (o.id === opId ? " active" : "")}>
-                        <button className="op-btn" onClick={() => selectOp(o.id)}>{o.name}</button>
+                {catalog.projects.map((g) => {
+                  const hasActive = g.operations.some((o) => o.id === opId);
+                  return (
+                    <div className={"proj" + (hasActive ? " proj-active" : "")} key={g.order}>
+                      <div className="proj-title">
+                        <span className="proj-num">{g.order}</span>
+                        <span className="proj-name">{g.project}</span>
                       </div>
-                    ))}
-                  </div>
-                ))}
+                      <div className="proj-ops">
+                        {g.operations.map((o) => (
+                          <div key={o.id} className={"op-row" + (o.id === opId ? " active" : "")}>
+                            <button className="op-btn" onClick={() => selectOp(o.id)}>{o.name}</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </aside>
 
